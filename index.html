@@ -73,6 +73,13 @@ h3.item{font-size:18px;margin:4px 0 10px}
 .ft .tags{position:absolute;bottom:6px;left:6px;right:6px;display:flex;flex-wrap:wrap;gap:4px}
 .ft .tag{font-size:11px;background:rgba(0,0,0,.55);color:#fff;padding:2px 6px;border-radius:4px}
 .ft .tag.video{background:rgba(163,91,0,.9)}
+.ft .tag.nota{background:rgba(0,0,0,.7);font-weight:600}
+.ft .tag.esc{background:rgba(31,95,191,.92)}
+.pre-info{font-size:13px;color:var(--sub);padding:8px 14px 0}
+.global{display:flex;flex-wrap:wrap;gap:8px;align-items:center;background:var(--card);border:1px solid var(--linha);border-radius:12px;padding:10px 12px;margin:0 0 14px}
+.global span{color:var(--sub);font-size:13px;flex:1;min-width:200px}
+.login-cred{margin-top:16px;text-align:center;font-size:12px;color:var(--sub)}
+.login-cred a{color:var(--sub)}
 .aviso-video{font-size:13px;color:var(--av);background:var(--av-bg);padding:7px 14px;border-bottom:1px solid var(--linha)}
 .busca{display:flex;gap:6px;align-items:center;flex:1;min-width:200px;max-width:420px}
 .busca input{flex:1;min-width:0;font:inherit;padding:7px 10px;border-radius:8px;border:1px solid var(--linha);background:var(--bg);color:var(--txt)}
@@ -124,6 +131,7 @@ footer.credito a:hover{text-decoration:underline}
     <label><input type="checkbox" id="lembrar"> Lembrar neste navegador</label>
     <button class="pri" id="btEntrar">Entrar</button>
     <div id="erro"></div>
+    <div class="login-cred">Desenvolvido por André Zulato — <a href="https://zulatonet.com.br" target="_blank" rel="noopener">ZULATONET</a></div>
   </form>
 </div>
 
@@ -175,14 +183,20 @@ function carregarEstado(){
 }
 function salvar(){ try { localStorage.setItem(CHAVE_EST, JSON.stringify(est)); } catch(_) {} }
 function agora(){ return new Date().toLocaleString("pt-BR",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"}); }
-function selDe(id){ return est.sel[id] || []; }
+// Sem escolha do usuário, o evento vem com as 3 fotos de maior pontuação (pré-seleção da curadoria).
+const N_PRE = 3;
+function preSel(id){ const ev = POR_ID[id]; return ev ? ev.fotos.slice(0, N_PRE).map(f => f.id) : []; }
+function selDe(id){ return est.sel[id] !== undefined ? est.sel[id] : preSel(id); }
+const ehPre = id => est.sel[id] === undefined;
+const nota = f => { const n = parseFloat(f.nota); return isNaN(n) ? null : Math.min(10, n); };
 function status(ev){
   const s = selDe(ev.id), b = est.baixado[ev.id];
   if (b){
     const igual = s.length === b.fotos.length && s.every(x => b.fotos.includes(x));
     return igual ? {c:"ok", t:"Baixado " + b.quando.slice(0,5)} : {c:"av", t:"Seleção alterada após baixar"};
   }
-  return s.length ? {c:"av", t:"Não baixado"} : {c:"", t:"Sem seleção"};
+  if (!s.length) return {c:"", t:"Sem seleção"};
+  return {c:"av", t: ehPre(ev.id) ? "Pré-seleção · não baixado" : "Não baixado"};
 }
 function baixadoOk(ev){ return status(ev).c === "ok"; }
 
@@ -263,6 +277,7 @@ function atualizarProgresso(){
   const ok = EVENTOS.filter(baixadoOk).length;
   document.getElementById("prog").textContent = `${ok} de ${EVENTOS.length} eventos baixados`;
   document.getElementById("trilho").style.width = (100 * ok / EVENTOS.length) + "%";
+  atualizarGlobal();
 }
 
 function render(){
@@ -274,6 +289,7 @@ function render(){
   const q = normal(document.getElementById("busca").value.trim());
   if (q) return renderBusca(main, q);
   try { sessionStorage.setItem("pg", pagina); } catch(_) {}
+  main.appendChild(barraGlobal());
   main.appendChild(nav());
   const ini = pagina * POR_PAGINA, fim = ini + POR_PAGINA;
   let ultSecao = null, ultItem = null;
@@ -331,6 +347,46 @@ document.getElementById("busca").addEventListener("input", () => {
   }, 250);
 });
 
+// ---------- ações em todos os eventos ----------
+function barraGlobal(){
+  const comSel = EVENTOS.filter(ev => selDe(ev.id).length);
+  const nSel = comSel.reduce((a, ev) => a + selDe(ev.id).length, 0);
+  const nTot = EVENTOS.reduce((a, ev) => a + ev.fotos.length, 0);
+  const d = el("div", "global");
+  const sp = el("span", "", ""); sp.id = "gInfo";
+  d.append(sp);
+  const bTodas = el("button", "", "Selecionar todas de todos");
+  bTodas.onclick = () => {
+    if (!confirm(`Selecionar todas as ${nTot} fotos de todos os ${EVENTOS.length} eventos?`)) return;
+    EVENTOS.forEach(ev => est.sel[ev.id] = ev.fotos.map(f => f.id)); salvar(); render();
+  };
+  const bPre = el("button", "", "Pré-seleção em todos (3 por evento)");
+  bPre.onclick = () => {
+    if (!confirm("Voltar todos os eventos para a pré-seleção das 3 melhores fotos? As escolhas feitas à mão serão perdidas.")) return;
+    est.sel = {}; salvar(); render();
+  };
+  const bLimpa = el("button", "", "Limpar todas");
+  bLimpa.onclick = () => {
+    if (!confirm("Desmarcar as fotos de todos os eventos?")) return;
+    EVENTOS.forEach(ev => est.sel[ev.id] = []); salvar(); render();
+  };
+  const bBx = el("button", "pri", ""); bBx.id = "gBx";
+  bBx.onclick = () => baixarEventos(EVENTOS.filter(ev => selDe(ev.id).length), "todos");
+  d.append(bTodas, bPre, bLimpa, bBx);
+  setTimeout(atualizarGlobal);
+  return d;
+}
+function atualizarGlobal(){
+  const sp = document.getElementById("gInfo"), bx = document.getElementById("gBx");
+  if (!sp) return;
+  const comSel = EVENTOS.filter(ev => selDe(ev.id).length);
+  const nSel = comSel.reduce((a, ev) => a + selDe(ev.id).length, 0);
+  const nTot = EVENTOS.reduce((a, ev) => a + ev.fotos.length, 0);
+  sp.textContent = `${nSel} de ${nTot} fotos selecionadas em ${comSel.length} eventos.`;
+  bx.textContent = `Baixar todos os selecionados (${comSel.length} zips)`;
+  bx.disabled = !comSel.length;
+}
+
 const ehQuadro = f => /_t\d{2}-\d{2}(_\d+)?\.jpe?g$/i.test(f.nome);
 
 function nav(){
@@ -371,6 +427,9 @@ function cartao(ev){
     z.onclick = e => { e.stopPropagation(); abrirLB(ev, i); };
     d.append(img, chk, z);
     const tags = el("div", "tags");
+    const n = nota(f);
+    if (n !== null) tags.append(el("span", "tag nota", `${i+1}º · ★ ${n.toFixed(1)}`));
+    if (i < N_PRE) tags.append(el("span", "tag esc", "escolha André Z."));
     if (ehQuadro(f)) tags.append(el("span", "tag video", "frame de vídeo"));
     if (f.prefeito) tags.append(el("span", "tag", "prefeito"));
     if (tags.children.length) d.append(tags);
@@ -381,13 +440,16 @@ function cartao(ev){
   const cont = el("span", "cont");
   const todas = el("button", "", "Selecionar todas");
   todas.onclick = () => { est.sel[ev.id] = selDe(ev.id).length === ev.fotos.length ? [] : ev.fotos.map(f => f.id); salvar(); atualizarCartao(ev); };
+  const pre = el("button", "", "Voltar à pré-seleção");
+  pre.onclick = () => { delete est.sel[ev.id]; salvar(); atualizarCartao(ev); };
   const bx = el("button", "pri", "Baixar");
   bx.onclick = () => baixarEventos([ev]);
-  rod.append(cont, todas, bx);
+  rod.append(cont, pre, todas, bx);
+  const info = el("div", "pre-info");
   c.append(top);
   if (aviso) c.append(aviso);
-  c.append(grade, rod);
-  c._ui = {pill, cont, bx, todas, grade};
+  c.append(info, grade, rod);
+  c._ui = {pill, cont, bx, todas, grade, pre, info};
   atualizarCartao(ev, c);
   return c;
 }
@@ -402,6 +464,10 @@ function atualizarCartao(ev, c){
   u.bx.disabled = !s.length;
   u.bx.textContent = s.length ? `Baixar ${s.length} (zip)` : "Baixar";
   u.todas.textContent = s.length === ev.fotos.length ? "Limpar seleção" : "Selecionar todas";
+  u.pre.style.display = ehPre(ev.id) ? "none" : "";
+  u.info.textContent = ehPre(ev.id)
+    ? `Fotos em ordem de pontuação. As ${Math.min(N_PRE, ev.fotos.length)} melhores já vêm selecionadas pela curadoria de André Zulato — clique nas fotos para mudar.`
+    : "Fotos em ordem de pontuação. Seleção personalizada.";
   atualizarProgresso();
 }
 function alternar(ev, fid){
@@ -435,7 +501,8 @@ async function abrirLB(ev, i){
   lbEv = ev; lbI = i;
   const lb = document.getElementById("lb"); lb.style.display = "flex";
   const f = ev.fotos[i], img = document.getElementById("lbImg"), car = document.getElementById("lbCarreg");
-  document.getElementById("lbInfo").textContent = `${i+1}/${ev.fotos.length} · ${f.nome} · ${(f.bytes/1048576).toFixed(1)} MB` +
+  document.getElementById("lbInfo").textContent = `${i+1}/${ev.fotos.length}` +
+    (nota(f) !== null ? ` · ★ ${nota(f).toFixed(1)}` : "") + ` · ${f.nome} · ${(f.bytes/1048576).toFixed(1)} MB` +
     (ehQuadro(f) ? " · 🎞 frame de vídeo (pode haver distorção)" : "");
   atualizarLBSel();
   img.src = cacheMini[urlMini(f)] ? await cacheMini[urlMini(f)] : ""; car.style.display = "block";
@@ -514,17 +581,15 @@ function renderResumo(main){
    [semSel.length, "ainda sem seleção"], [nSel, "fotos selecionadas"]].forEach(([n, t]) => {
     const d = el("div", "num"); d.innerHTML = `<b>${n}</b><span>${t}</span>`; cards.append(d);
   });
-  main.append(el("h2", "secao", "Resumo"), cards);
+  main.append(el("h2", "secao", "Resumo"), cards, barraGlobal());
 
   const ferr = el("div", "ferr");
-  const bt = el("button", "pri", `Baixar todos os selecionados (${comSel.length} eventos, um zip por evento)`);
-  bt.disabled = !comSel.length; bt.onclick = () => baixarEventos(comSel, "todos");
   const btP = el("button", "", `Baixar só os pendentes (${naoBx.length + alt.length})`);
   btP.disabled = !(naoBx.length + alt.length); btP.onclick = () => baixarEventos([...naoBx, ...alt], "pendentes");
   const btCsv = el("button", "", "Exportar log (CSV)"); btCsv.onclick = exportarCSV;
   const btJs = el("button", "", "Salvar seleção (arquivo)"); btJs.onclick = exportarJSON;
   const btIm = el("button", "", "Carregar seleção (arquivo)"); btIm.onclick = importarJSON;
-  ferr.append(bt, btP, btCsv, btJs, btIm);
+  ferr.append(btP, btCsv, btJs, btIm);
   main.append(ferr);
 
   main.append(el("h2", "secao", "O que falta baixar"));
@@ -577,7 +642,7 @@ function renderSobre(main){
   <div class="rec"><b>2. Reconhecimento facial a partir do rosto do prefeito</b><p>Com algumas fotos de referência do prefeito, o sistema passou a identificar sozinho em quais imagens ele aparece, inclusive de perfil ou no meio do público. A presença dele foi usada como um bônus na escolha, sem deixar de fora as obras e entregas onde ele não aparece. O reconhecimento foi feito localmente, no próprio computador.</p></div>
   <div class="rec"><b>3. Fotos tiradas dos vídeos</b><p>Muitas ações só foram registradas em vídeo. Os vídeos foram lidos quadro a quadro e os melhores momentos viraram fotos em alta resolução — incluindo imagens aéreas de drone, que dão a dimensão das obras. Essas imagens estão identificadas com a marca “frame de vídeo”: por virem de vídeo, podem ter menor nitidez ou alguma distorção.</p></div>
   <div class="rec"><b>4. Inteligência artificial de análise de imagem</b><p>Cada imagem passou por uma análise com IA generativa, preparada para distinguir uma foto boa de uma ruim: nitidez, foto tremida, luz, enquadramento, ângulo, composição e valor para a matéria. Fotos tremidas, escuras, repetidas ou sem conteúdo foram descartadas automaticamente; fotos posadas e de equipes trabalhando foram priorizadas.</p></div>
-  <div class="rec"><b>5. Curadoria humana</b><p>A máquina faz o trabalho pesado, mas a palavra final é humana: mais de 50% das fotos passaram pela revisão e pelo aval manual de André Zulato antes de entrar na seleção.</p></div>
+  <div class="rec"><b>5. Curadoria humana</b><p>A máquina faz o trabalho pesado, mas a palavra final é humana: mais de 50% das fotos passaram pela revisão e pelo aval manual de André Zulato antes de entrar na seleção. Cada foto recebeu uma pontuação de 0 a 10; em cada evento elas aparecem da melhor para a pior, e as 3 melhores já vêm pré-selecionadas — basta baixar ou ajustar a escolha.</p></div>
   <div class="rec"><b>6. Entrega protegida</b><p>As fotos originais, em qualidade máxima, ficam disponíveis neste site com acesso por senha e arquivos criptografados. Imagens com pacientes e crianças receberam atenção especial, em respeito à LGPD.</p></div>
 
   <h2 class="secao">O que não foi encontrado no material</h2>
