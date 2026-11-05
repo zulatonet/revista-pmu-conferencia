@@ -70,7 +70,13 @@ h3.item{font-size:18px;margin:4px 0 10px}
 .ft .chk{position:absolute;top:6px;left:6px;width:24px;height:24px;border-radius:50%;border:2px solid #fff;background:rgba(0,0,0,.25);display:flex;align-items:center;justify-content:center;color:#fff;font-size:14px;font-weight:700}
 .ft.sel .chk{background:var(--sel);border-color:var(--sel)}
 .ft .zoom{position:absolute;top:6px;right:6px;width:28px;height:28px;border-radius:6px;border:none;background:rgba(0,0,0,.45);color:#fff;padding:0;font-size:15px;line-height:28px;text-align:center}
-.ft .tag{position:absolute;bottom:6px;left:6px;font-size:11px;background:rgba(0,0,0,.55);color:#fff;padding:2px 6px;border-radius:4px}
+.ft .tags{position:absolute;bottom:6px;left:6px;right:6px;display:flex;flex-wrap:wrap;gap:4px}
+.ft .tag{font-size:11px;background:rgba(0,0,0,.55);color:#fff;padding:2px 6px;border-radius:4px}
+.ft .tag.video{background:rgba(163,91,0,.9)}
+.aviso-video{font-size:13px;color:var(--av);background:var(--av-bg);padding:7px 14px;border-bottom:1px solid var(--linha)}
+.busca{display:flex;gap:6px;align-items:center;flex:1;min-width:200px;max-width:420px}
+.busca input{flex:1;min-width:0;font:inherit;padding:7px 10px;border-radius:8px;border:1px solid var(--linha);background:var(--bg);color:var(--txt)}
+.res-busca{color:var(--sub);font-size:14px;margin:4px 0 14px}
 .ev-rod{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:0 14px 12px}
 .ev-rod .cont{color:var(--sub);font-size:13px;flex:1}
 
@@ -93,6 +99,15 @@ td a{color:var(--pri);cursor:pointer;text-decoration:underline}
 #modal .caixa{background:var(--card);color:var(--txt);border-radius:12px;padding:20px;width:100%;max-width:440px}
 #modal .barraP{height:8px;background:var(--neu-bg);border-radius:4px;overflow:hidden;margin:12px 0}
 #modal .barraP div{height:100%;background:var(--pri);width:0}
+.sobre{max-width:820px}
+.sobre p{margin:0 0 12px}
+.sobre ul{margin:0 0 14px;padding-left:20px}
+.sobre li{margin-bottom:6px}
+.sobre .cards{margin:16px 0 8px;grid-template-columns:repeat(auto-fit,minmax(140px,1fr))}
+.rec{background:var(--card);border:1px solid var(--linha);border-radius:12px;padding:12px 16px;margin-bottom:10px}
+.rec p{margin:6px 0 0;color:var(--sub)}
+.rec a{color:var(--pri)}
+.credito-box p{color:var(--txt)}
 footer.credito{text-align:center;font-size:11px;color:var(--sub);opacity:.6;padding:18px 16px 22px}
 footer.credito a{color:inherit;text-decoration:none}
 footer.credito a:hover{text-decoration:underline}
@@ -119,7 +134,9 @@ footer.credito a:hover{text-decoration:underline}
       <div class="abas">
         <button data-v="eventos" class="ativa">Eventos</button>
         <button data-v="resumo">Resumo e pendências</button>
+        <button data-v="sobre">Sobre o trabalho</button>
       </div>
+      <div class="busca"><input type="search" id="busca" placeholder="Buscar evento, item, data (ex.: SAMU, creche, 08/2025)…" autocomplete="off"></div>
       <div class="esp"></div>
       <span class="progresso" id="prog"></span>
       <button id="btSair" title="Sair">Sair</button>
@@ -253,6 +270,9 @@ function render(){
   const main = document.getElementById("main");
   main.innerHTML = "";
   if (vista === "resumo") return renderResumo(main);
+  if (vista === "sobre") return renderSobre(main);
+  const q = normal(document.getElementById("busca").value.trim());
+  if (q) return renderBusca(main, q);
   try { sessionStorage.setItem("pg", pagina); } catch(_) {}
   main.appendChild(nav());
   const ini = pagina * POR_PAGINA, fim = ini + POR_PAGINA;
@@ -277,6 +297,41 @@ function render(){
   main.appendChild(nav());
   observarMinis();
 }
+
+// ---------- busca ----------
+const normal = s => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+function textoBusca(ev){
+  return ev._busca || (ev._busca = normal([ev.titulo, ev.pasta, ev.item, ev.secao, dataBR(ev.data), ev.data].join(" ")));
+}
+function renderBusca(main, q){
+  const termos = q.split(/\s+/);
+  const achados = EVENTOS.filter(ev => termos.every(t => textoBusca(ev).includes(t)));
+  const limpar = el("button", "", "Limpar busca");
+  limpar.onclick = () => { document.getElementById("busca").value = ""; render(); };
+  const info = el("div", "res-busca");
+  info.append(`${achados.length} evento(s) encontrado(s). `, limpar);
+  main.append(info);
+  let ultItem = null;
+  for (const ev of achados.slice(0, 40)){
+    if (ev.item !== ultItem){ main.append(el("h3", "item", ev.secao + " › " + ev.item)); ultItem = ev.item; }
+    main.append(cartao(ev));
+  }
+  if (achados.length > 40) main.append(el("div", "sem", "Mostrando os 40 primeiros. Refine a busca para ver os demais."));
+  observarMinis();
+}
+let tBusca;
+document.getElementById("busca").addEventListener("input", () => {
+  clearTimeout(tBusca);
+  tBusca = setTimeout(() => {
+    if (vista !== "eventos"){
+      vista = "eventos";
+      document.querySelectorAll(".abas button").forEach(x => x.classList.toggle("ativa", x.dataset.v === "eventos"));
+    }
+    render(); scrollTo(0, 0);
+  }, 250);
+});
+
+const ehQuadro = f => /_t\d{2}-\d{2}(_\d+)?\.jpe?g$/i.test(f.nome);
 
 function nav(){
   const d = el("div", "nav");
@@ -304,6 +359,9 @@ function cartao(ev){
   t.innerHTML = `<b>${esc(ev.titulo)}</b><span>${dataBR(ev.data)} · ${ev.fotos.length} fotos · ${esc(ev.item)}</span>`;
   const pill = el("span", "pill");
   top.append(t, pill);
+  const nq = ev.fotos.filter(ehQuadro).length;
+  const aviso = nq ? el("div", "aviso-video",
+    `🎞 ${nq === ev.fotos.length ? "Todas as fotos" : nq + " das " + ev.fotos.length + " fotos"} deste evento foram retiradas de vídeo (marcadas como “frame de vídeo”). Podem ter menor nitidez, borrão de movimento ou distorção.`) : null;
   const grade = el("div", "grade");
   ev.fotos.forEach((f, i) => {
     const d = el("div", "ft"); d.dataset.fid = f.id;
@@ -312,7 +370,10 @@ function cartao(ev){
     const z = el("button", "zoom", "⤢"); z.title = "Ver em tamanho grande";
     z.onclick = e => { e.stopPropagation(); abrirLB(ev, i); };
     d.append(img, chk, z);
-    if (f.prefeito) d.append(el("span", "tag", "prefeito"));
+    const tags = el("div", "tags");
+    if (ehQuadro(f)) tags.append(el("span", "tag video", "frame de vídeo"));
+    if (f.prefeito) tags.append(el("span", "tag", "prefeito"));
+    if (tags.children.length) d.append(tags);
     d.onclick = () => alternar(ev, f.id);
     grade.append(d);
   });
@@ -323,7 +384,9 @@ function cartao(ev){
   const bx = el("button", "pri", "Baixar");
   bx.onclick = () => baixarEventos([ev]);
   rod.append(cont, todas, bx);
-  c.append(top, grade, rod);
+  c.append(top);
+  if (aviso) c.append(aviso);
+  c.append(grade, rod);
   c._ui = {pill, cont, bx, todas, grade};
   atualizarCartao(ev, c);
   return c;
@@ -372,7 +435,8 @@ async function abrirLB(ev, i){
   lbEv = ev; lbI = i;
   const lb = document.getElementById("lb"); lb.style.display = "flex";
   const f = ev.fotos[i], img = document.getElementById("lbImg"), car = document.getElementById("lbCarreg");
-  document.getElementById("lbInfo").textContent = `${i+1}/${ev.fotos.length} · ${f.nome} · ${(f.bytes/1048576).toFixed(1)} MB`;
+  document.getElementById("lbInfo").textContent = `${i+1}/${ev.fotos.length} · ${f.nome} · ${(f.bytes/1048576).toFixed(1)} MB` +
+    (ehQuadro(f) ? " · 🎞 frame de vídeo (pode haver distorção)" : "");
   atualizarLBSel();
   img.src = cacheMini[urlMini(f)] ? await cacheMini[urlMini(f)] : ""; car.style.display = "block";
   try {
@@ -482,6 +546,53 @@ function renderResumo(main){
     est.log.slice().reverse().map(l => [l.quando, esc(l.evento), esc(l.fotos.join(", ")), l.tipo]), true));
   main.append(el("p", "pg", `Material gerado em ${M.gerado}. A seleção e o log ficam salvos neste navegador; use “Salvar seleção” para levar a outro computador.`));
 }
+// ---------- sobre o trabalho ----------
+const RESSALVAS = [
+  ["Reforma do Banco de Alimentos", "O material mostra a operação do Banco de Alimentos (separação da merenda) e o mutirão de limpeza; não há registro da obra de reforma em si."],
+  ["Creches — Ursinhos Carinhosos", "Há a visita à obra quase concluída (08/2026); a inauguração de 02/10 é posterior ao material disponível."],
+  ["Máquinas (tratores)", "Na entrega registrada aparecem pás carregadeiras, não tratores agrícolas."],
+  ["Itens com poucas fotos", "Creches Bom Jesus/Garapuava e Pinoquinho, Castração de 5 mil, Reforço do transporte e Água tratada Sagrada Família têm de 3 a 4 fotos aproveitáveis."]
+];
+function renderSobre(main){
+  const nFotos = EVENTOS.reduce((a, ev) => a + ev.fotos.length, 0);
+  const sem = [];
+  M.secoes.forEach(s => s.itens.forEach(it => it.sem_fotos && sem.push(it)));
+  const d = el("div", "sobre");
+  d.innerHTML = `
+  <h2 class="secao">Sobre o trabalho</h2>
+  <h3 class="item">Do acervo bruto à seleção pronta para a revista — em 2 dias</h3>
+  <p>A gestão acumulou um acervo de <b>mais de 500 GB de fotos e vídeos</b>, espalhado em mais de 1.200 pastas de eventos, sem catálogo e sem ligação com a lista de ações que a revista precisava ilustrar. Encontrar cada entrega nesse volume, escolher as melhores imagens e separar por tema é um trabalho que, feito à mão, consome semanas.</p>
+  <p>Para resolver isso foi desenvolvida uma estrutura própria de busca, análise e catalogação, que percorreu o acervo inteiro e entregou, em 2 dias (04 e 05/11/2026), a seleção que você confere neste site.</p>
+
+  <div class="cards">
+    <div class="num"><b>1.200+</b><span>pastas de eventos mapeadas</span></div>
+    <div class="num"><b>4.500+</b><span>vídeos lidos quadro a quadro</span></div>
+    <div class="num"><b>5.000+</b><span>imagens avaliadas uma a uma</span></div>
+    <div class="num"><b>${EVENTOS.length}</b><span>eventos ligados à lista</span></div>
+    <div class="num"><b>${nFotos}</b><span>fotos finais em alta qualidade</span></div>
+  </div>
+
+  <h2 class="secao">Recursos utilizados</h2>
+  <div class="rec"><b>1. Mapeamento do acervo</b><p>Cada item da lista de ações foi cruzado com as datas e os nomes das pastas de fotos e vídeos, localizando onde estava cada entrega — inclusive as que só existiam em vídeo.</p></div>
+  <div class="rec"><b>2. Reconhecimento facial a partir do rosto do prefeito</b><p>Com algumas fotos de referência do prefeito, o sistema passou a identificar sozinho em quais imagens ele aparece, inclusive de perfil ou no meio do público. A presença dele foi usada como um bônus na escolha, sem deixar de fora as obras e entregas onde ele não aparece. O reconhecimento foi feito localmente, no próprio computador.</p></div>
+  <div class="rec"><b>3. Fotos tiradas dos vídeos</b><p>Muitas ações só foram registradas em vídeo. Os vídeos foram lidos quadro a quadro e os melhores momentos viraram fotos em alta resolução — incluindo imagens aéreas de drone, que dão a dimensão das obras. Essas imagens estão identificadas com a marca “frame de vídeo”: por virem de vídeo, podem ter menor nitidez ou alguma distorção.</p></div>
+  <div class="rec"><b>4. Inteligência artificial de análise de imagem</b><p>Cada imagem passou por uma análise com IA generativa, preparada para distinguir uma foto boa de uma ruim: nitidez, foto tremida, luz, enquadramento, ângulo, composição e valor para a matéria. Fotos tremidas, escuras, repetidas ou sem conteúdo foram descartadas automaticamente; fotos posadas e de equipes trabalhando foram priorizadas.</p></div>
+  <div class="rec"><b>5. Curadoria humana</b><p>A máquina faz o trabalho pesado, mas a palavra final é humana: mais de 50% das fotos passaram pela revisão e pelo aval manual de André Zulato antes de entrar na seleção.</p></div>
+  <div class="rec"><b>6. Entrega protegida</b><p>As fotos originais, em qualidade máxima, ficam disponíveis neste site com acesso por senha e arquivos criptografados. Imagens com pacientes e crianças receberam atenção especial, em respeito à LGPD.</p></div>
+
+  <h2 class="secao">O que não foi encontrado no material</h2>
+  <p>Os itens abaixo da lista não têm registro em foto ou vídeo no acervo recebido:</p>
+  <ul>${sem.map(it => `<li><b>${esc(it.titulo)}</b> — ${esc(it.sem_fotos)}</li>`).join("")}</ul>
+  <p>Itens encontrados, mas com ressalvas:</p>
+  <ul>${RESSALVAS.map(r => `<li><b>${esc(r[0])}</b> — ${esc(r[1])}</li>`).join("")}</ul>
+
+  <h2 class="secao">Créditos</h2>
+  <div class="rec credito-box"><p>Programação de toda a infraestrutura, processamento do acervo e curadoria:<br>
+  <b style="font-size:17px">André Zulato</b> — <a href="https://zulatonet.com.br" target="_blank" rel="noopener">ZULATONET</a></p>
+  <p style="color:var(--sub);font-size:13px">Soluções sob medida em produção audiovisual, automação e inteligência artificial.</p></div>`;
+  main.append(d);
+}
+
 function irPara(ev){
   return `<a data-ev="${ev.id}">abrir</a>`;
 }
