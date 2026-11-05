@@ -1,0 +1,542 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Conferência de Fotos</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style>
+:root{
+  --bg:#f4f5f7; --card:#fff; --txt:#1d2433; --sub:#5d6678; --linha:#e2e5ea;
+  --pri:#1f5fbf; --pri-txt:#fff; --ok:#1e8e4e; --ok-bg:#e3f4ea; --av:#a35b00; --av-bg:#fdf0dc;
+  --neu-bg:#eceef2; --sel:#1f5fbf; --sombra:0 1px 3px rgba(0,0,0,.08);
+}
+@media (prefers-color-scheme: dark){
+  :root{ --bg:#14171d; --card:#1d2129; --txt:#e8ebf1; --sub:#9aa3b5; --linha:#2d333e;
+    --pri:#4d8df0; --ok:#4cc27e; --ok-bg:#183527; --av:#f0a64a; --av-bg:#3a2a12; --neu-bg:#262b35; --sel:#5b9bff;
+    --sombra:none; }
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--txt);font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+button{font:inherit;cursor:pointer;border-radius:8px;border:1px solid var(--linha);background:var(--card);color:var(--txt);padding:7px 12px}
+button.pri{background:var(--pri);border-color:var(--pri);color:var(--pri-txt);font-weight:600}
+button:disabled{opacity:.45;cursor:default}
+select{font:inherit;padding:7px 8px;border-radius:8px;border:1px solid var(--linha);background:var(--card);color:var(--txt);max-width:100%}
+
+/* login */
+#login{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:16px}
+#login form{background:var(--card);padding:28px;border-radius:14px;box-shadow:var(--sombra);width:100%;max-width:360px;border:1px solid var(--linha)}
+#login h1{font-size:20px;margin:0 0 4px}
+#login p{color:var(--sub);margin:0 0 18px;font-size:14px}
+#login input[type=password]{width:100%;font:inherit;padding:10px 12px;border-radius:8px;border:1px solid var(--linha);background:var(--bg);color:var(--txt);margin-bottom:10px}
+#login label{display:flex;gap:6px;align-items:center;font-size:13px;color:var(--sub);margin-bottom:14px}
+#login button{width:100%}
+#erro{color:#d33;font-size:14px;min-height:20px;margin-top:8px}
+
+/* app */
+#app{display:none}
+header{position:sticky;top:0;z-index:5;background:var(--card);border-bottom:1px solid var(--linha);box-shadow:var(--sombra)}
+.barra{max-width:1200px;margin:0 auto;padding:10px 16px;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.barra h1{font-size:17px;margin:0 12px 0 0;white-space:nowrap}
+.abas{display:flex;gap:4px}
+.abas button{border:none;background:none;padding:7px 10px;color:var(--sub)}
+.abas button.ativa{background:var(--neu-bg);color:var(--txt);font-weight:600}
+.esp{flex:1}
+.progresso{font-size:13px;color:var(--sub);white-space:nowrap}
+.trilho{height:4px;background:var(--neu-bg)}
+.trilho div{height:100%;background:var(--ok);width:0;transition:width .3s}
+main{max-width:1200px;margin:0 auto;padding:16px}
+.nav{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:4px 0 16px}
+.nav .pg{color:var(--sub);font-size:14px}
+h2.secao{font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:var(--sub);margin:26px 0 8px}
+h3.item{font-size:18px;margin:4px 0 10px}
+.sem{background:var(--card);border:1px dashed var(--linha);border-radius:12px;padding:12px 14px;margin:0 0 14px;color:var(--sub);font-size:14px}
+.sem b{color:var(--txt)}
+.ev{background:var(--card);border:1px solid var(--linha);border-radius:12px;box-shadow:var(--sombra);margin:0 0 16px;overflow:hidden}
+.ev.feito{border-color:var(--ok)}
+.ev-top{display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:12px 14px;border-bottom:1px solid var(--linha)}
+.ev-tit{flex:1;min-width:220px}
+.ev-tit b{display:block;font-size:15px}
+.ev-tit span{color:var(--sub);font-size:13px}
+.pill{font-size:12px;font-weight:600;padding:4px 9px;border-radius:99px;white-space:nowrap;background:var(--neu-bg);color:var(--sub)}
+.pill.ok{background:var(--ok-bg);color:var(--ok)}
+.pill.av{background:var(--av-bg);color:var(--av)}
+.grade{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;padding:12px 14px}
+.ft{position:relative;aspect-ratio:1;border-radius:8px;overflow:hidden;background:var(--neu-bg);cursor:pointer;outline:3px solid transparent;outline-offset:-3px;transition:outline-color .12s}
+.ft img{width:100%;height:100%;object-fit:cover;display:block;transition:opacity .2s}
+.ft.sel{outline-color:var(--sel)}
+.ft.sel img{opacity:.82}
+.ft .chk{position:absolute;top:6px;left:6px;width:24px;height:24px;border-radius:50%;border:2px solid #fff;background:rgba(0,0,0,.25);display:flex;align-items:center;justify-content:center;color:#fff;font-size:14px;font-weight:700}
+.ft.sel .chk{background:var(--sel);border-color:var(--sel)}
+.ft .zoom{position:absolute;top:6px;right:6px;width:28px;height:28px;border-radius:6px;border:none;background:rgba(0,0,0,.45);color:#fff;padding:0;font-size:15px;line-height:28px;text-align:center}
+.ft .tag{position:absolute;bottom:6px;left:6px;font-size:11px;background:rgba(0,0,0,.55);color:#fff;padding:2px 6px;border-radius:4px}
+.ev-rod{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:0 14px 12px}
+.ev-rod .cont{color:var(--sub);font-size:13px;flex:1}
+
+/* resumo */
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin-bottom:18px}
+.num{background:var(--card);border:1px solid var(--linha);border-radius:12px;padding:12px 14px}
+.num b{font-size:26px;display:block}
+.num span{color:var(--sub);font-size:13px}
+table{width:100%;border-collapse:collapse;background:var(--card);border-radius:12px;overflow:hidden;border:1px solid var(--linha);font-size:14px}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--linha);vertical-align:top}
+th{font-size:12px;color:var(--sub);text-transform:uppercase;letter-spacing:.04em}
+td a{color:var(--pri);cursor:pointer;text-decoration:underline}
+.ferr{display:flex;flex-wrap:wrap;gap:8px;margin:18px 0}
+
+/* lightbox e modal */
+#lb,#modal{position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:20;display:none;align-items:center;justify-content:center;flex-direction:column;padding:12px}
+#lb img{max-width:100%;max-height:calc(100vh - 90px);object-fit:contain}
+#lb .lbbar{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;justify-content:center;color:#ddd;align-items:center}
+#lb .carreg{color:#ccc}
+#modal .caixa{background:var(--card);color:var(--txt);border-radius:12px;padding:20px;width:100%;max-width:440px}
+#modal .barraP{height:8px;background:var(--neu-bg);border-radius:4px;overflow:hidden;margin:12px 0}
+#modal .barraP div{height:100%;background:var(--pri);width:0}
+footer.credito{text-align:center;font-size:11px;color:var(--sub);opacity:.6;padding:18px 16px 22px}
+footer.credito a{color:inherit;text-decoration:none}
+footer.credito a:hover{text-decoration:underline}
+#login{min-height:calc(100vh - 60px)}
+@media (max-width:600px){ .grade{grid-template-columns:repeat(2,1fr)} .barra h1{font-size:15px} }
+</style>
+</head>
+<body>
+<div id="login">
+  <form id="fLogin">
+    <h1>Conferência de Fotos</h1>
+    <p>Revista da gestão — acesso restrito.</p>
+    <input type="password" id="senha" placeholder="Senha" autocomplete="current-password" autofocus>
+    <label><input type="checkbox" id="lembrar"> Lembrar neste navegador</label>
+    <button class="pri" id="btEntrar">Entrar</button>
+    <div id="erro"></div>
+  </form>
+</div>
+
+<div id="app">
+  <header>
+    <div class="barra">
+      <h1>Conferência de Fotos</h1>
+      <div class="abas">
+        <button data-v="eventos" class="ativa">Eventos</button>
+        <button data-v="resumo">Resumo e pendências</button>
+      </div>
+      <div class="esp"></div>
+      <span class="progresso" id="prog"></span>
+      <button id="btSair" title="Sair">Sair</button>
+    </div>
+    <div class="trilho"><div id="trilho"></div></div>
+  </header>
+  <main id="main"></main>
+</div>
+
+<footer class="credito">Criado por André Zulato · <a href="https://zulatonet.com.br" target="_blank" rel="noopener">ZULATONET</a></footer>
+
+<div id="lb">
+  <img id="lbImg" alt="">
+  <div class="carreg" id="lbCarreg">Carregando original…</div>
+  <div class="lbbar">
+    <button id="lbAnt">◀</button>
+    <button id="lbSel" class="pri">Selecionar</button>
+    <button id="lbProx">▶</button>
+    <span id="lbInfo"></span>
+    <button id="lbFechar">Fechar ✕</button>
+  </div>
+</div>
+<div id="modal"><div class="caixa"><b id="mTit">Baixando…</b><div class="barraP"><div id="mBarra"></div></div><div id="mTxt" style="font-size:14px;color:var(--sub)"></div></div></div>
+
+<script>
+"use strict";
+const POR_PAGINA = 10;
+const CHAVE_EST = "conferencia_fotos_v1";
+let CFG, CHAVE, M, EVENTOS = [], BLOCOS = [], POR_ID = {}, pagina = 0, vista = "eventos";
+let est = carregarEstado();
+
+// ---------- estado (seleção, baixados, log) ----------
+function carregarEstado(){
+  try { const e = JSON.parse(localStorage.getItem(CHAVE_EST)); if (e && e.sel) return e; } catch(_) {}
+  return { sel:{}, baixado:{}, log:[] };
+}
+function salvar(){ try { localStorage.setItem(CHAVE_EST, JSON.stringify(est)); } catch(_) {} }
+function agora(){ return new Date().toLocaleString("pt-BR",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"}); }
+function selDe(id){ return est.sel[id] || []; }
+function status(ev){
+  const s = selDe(ev.id), b = est.baixado[ev.id];
+  if (b){
+    const igual = s.length === b.fotos.length && s.every(x => b.fotos.includes(x));
+    return igual ? {c:"ok", t:"Baixado " + b.quando.slice(0,5)} : {c:"av", t:"Seleção alterada após baixar"};
+  }
+  return s.length ? {c:"av", t:"Não baixado"} : {c:"", t:"Sem seleção"};
+}
+function baixadoOk(ev){ return status(ev).c === "ok"; }
+
+// ---------- cripto ----------
+const b64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+async function derivar(senha){
+  const base = await crypto.subtle.importKey("raw", new TextEncoder().encode(senha), "PBKDF2", false, ["deriveKey"]);
+  return crypto.subtle.deriveKey({name:"PBKDF2", salt:b64(CFG.sal), iterations:CFG.iter, hash:"SHA-256"},
+    base, {name:"AES-GCM", length:256}, true, ["decrypt"]);
+}
+async function abrir(buf){
+  return crypto.subtle.decrypt({name:"AES-GCM", iv:buf.slice(0,12)}, CHAVE, buf.slice(12));
+}
+async function baixarBin(url){
+  const r = await fetch(url);
+  if (!r.ok) throw new Error("HTTP " + r.status + " em " + url);
+  return abrir(await r.arrayBuffer());
+}
+const urlMini = f => "t/" + f.id + ".bin";
+const urlOrig = f => CFG.partes[f.parte] + "f/" + f.id + ".bin";
+
+// ---------- login ----------
+async function entrar(senha, lembrar){
+  CHAVE = await derivar(senha);
+  const m = await baixarBin("m.bin");             // falha aqui = senha errada
+  M = JSON.parse(new TextDecoder().decode(m));
+  const raw = btoa(String.fromCharCode(...new Uint8Array(await crypto.subtle.exportKey("raw", CHAVE))));
+  try { sessionStorage.setItem("k", raw); if (lembrar) localStorage.setItem("k", raw); } catch(_) {}
+}
+async function entrarComChave(raw){
+  CHAVE = await crypto.subtle.importKey("raw", b64(raw), "AES-GCM", true, ["decrypt"]);
+  M = JSON.parse(new TextDecoder().decode(await baixarBin("m.bin")));
+}
+document.getElementById("fLogin").onsubmit = async e => {
+  e.preventDefault();
+  const bt = document.getElementById("btEntrar"), er = document.getElementById("erro");
+  bt.disabled = true; bt.textContent = "Abrindo…"; er.textContent = "";
+  try { await entrar(document.getElementById("senha").value, document.getElementById("lembrar").checked); iniciar(); }
+  catch(x){ er.textContent = x.name === "OperationError" ? "Senha incorreta." : "Erro: " + x.message; }
+  bt.disabled = false; bt.textContent = "Entrar";
+};
+document.getElementById("btSair").onclick = () => {
+  try { sessionStorage.removeItem("k"); localStorage.removeItem("k"); } catch(_) {}
+  location.reload();
+};
+
+// ---------- montagem ----------
+function iniciar(){
+  document.getElementById("login").style.display = "none";
+  document.getElementById("app").style.display = "block";
+  // blocos em ordem: cada evento carrega antes de si os títulos de seção/item e os itens sem fotos
+  let pend = [];
+  for (const s of M.secoes){
+    pend.push({tipo:"secao", titulo:s.titulo});
+    for (const it of s.itens){
+      if (it.sem_fotos){ pend.push({tipo:"sem", item:it, secao:s.titulo}); continue; }
+      pend.push({tipo:"item", titulo:it.titulo});
+      for (const ev of it.eventos){
+        ev.item = it.titulo; ev.secao = s.titulo; ev.n = EVENTOS.length;
+        EVENTOS.push(ev); POR_ID[ev.id] = ev;
+        BLOCOS.push({antes:pend, ev}); pend = [];
+      }
+    }
+  }
+  if (pend.length) BLOCOS.push({antes:pend, ev:null});
+  try { pagina = Math.min(+sessionStorage.getItem("pg") || 0, totalPaginas() - 1); } catch(_) {}
+  render();
+}
+const totalPaginas = () => Math.ceil(EVENTOS.length / POR_PAGINA);
+
+document.querySelectorAll(".abas button").forEach(b => b.onclick = () => {
+  vista = b.dataset.v;
+  document.querySelectorAll(".abas button").forEach(x => x.classList.toggle("ativa", x === b));
+  render(); scrollTo(0,0);
+});
+
+function atualizarProgresso(){
+  const ok = EVENTOS.filter(baixadoOk).length;
+  document.getElementById("prog").textContent = `${ok} de ${EVENTOS.length} eventos baixados`;
+  document.getElementById("trilho").style.width = (100 * ok / EVENTOS.length) + "%";
+}
+
+function render(){
+  atualizarProgresso();
+  const main = document.getElementById("main");
+  main.innerHTML = "";
+  if (vista === "resumo") return renderResumo(main);
+  try { sessionStorage.setItem("pg", pagina); } catch(_) {}
+  main.appendChild(nav());
+  const ini = pagina * POR_PAGINA, fim = ini + POR_PAGINA;
+  let ultSecao = null, ultItem = null;
+  const blocos = BLOCOS.filter(b => b.ev ? (b.ev.n >= ini && b.ev.n < fim) : pagina === totalPaginas() - 1);
+  // na 1ª exibição da página, repete seção e item atuais (contexto)
+  if (blocos[0] && blocos[0].ev && !blocos[0].antes.some(x => x.tipo === "item")){
+    main.appendChild(el("h2", "secao", blocos[0].ev.secao));
+    main.appendChild(el("h3", "item", blocos[0].ev.item + " (continuação)"));
+  }
+  for (const b of blocos){
+    for (const x of b.antes){
+      if (x.tipo === "secao") main.appendChild(el("h2", "secao", x.titulo));
+      else if (x.tipo === "item") main.appendChild(el("h3", "item", x.titulo));
+      else if (x.tipo === "sem"){
+        const d = el("div", "sem"); d.innerHTML = `<b>${esc(x.item.titulo)}</b> — sem fotos. ${esc(x.item.sem_fotos)}`;
+        main.appendChild(d);
+      }
+    }
+    if (b.ev) main.appendChild(cartao(b.ev));
+  }
+  main.appendChild(nav());
+  observarMinis();
+}
+
+function nav(){
+  const d = el("div", "nav");
+  const ant = el("button", "", "◀ Anterior"); ant.disabled = pagina === 0;
+  ant.onclick = () => { pagina--; render(); scrollTo(0,0); };
+  const prox = el("button", "", "Próxima ▶"); prox.disabled = pagina >= totalPaginas() - 1;
+  prox.onclick = () => { pagina++; render(); scrollTo(0,0); };
+  const sel = document.createElement("select");
+  for (let p = 0; p < totalPaginas(); p++){
+    const evs = EVENTOS.slice(p*POR_PAGINA, (p+1)*POR_PAGINA);
+    const ok = evs.filter(baixadoOk).length;
+    const o = new Option(`Página ${p+1} — ${evs[0].item}${ok === evs.length ? "  ✓" : ""}`, p);
+    if (p === pagina) o.selected = true;
+    sel.add(o);
+  }
+  sel.onchange = () => { pagina = +sel.value; render(); scrollTo(0,0); };
+  d.append(ant, sel, prox, el("span", "pg", `Página ${pagina+1} de ${totalPaginas()}`));
+  return d;
+}
+
+function cartao(ev){
+  const c = el("div", "ev"); c.id = ev.id;
+  const top = el("div", "ev-top");
+  const t = el("div", "ev-tit");
+  t.innerHTML = `<b>${esc(ev.titulo)}</b><span>${dataBR(ev.data)} · ${ev.fotos.length} fotos · ${esc(ev.item)}</span>`;
+  const pill = el("span", "pill");
+  top.append(t, pill);
+  const grade = el("div", "grade");
+  ev.fotos.forEach((f, i) => {
+    const d = el("div", "ft"); d.dataset.fid = f.id;
+    const img = document.createElement("img"); img.alt = f.nome; img.dataset.src = urlMini(f);
+    const chk = el("div", "chk", "✓");
+    const z = el("button", "zoom", "⤢"); z.title = "Ver em tamanho grande";
+    z.onclick = e => { e.stopPropagation(); abrirLB(ev, i); };
+    d.append(img, chk, z);
+    if (f.prefeito) d.append(el("span", "tag", "prefeito"));
+    d.onclick = () => alternar(ev, f.id);
+    grade.append(d);
+  });
+  const rod = el("div", "ev-rod");
+  const cont = el("span", "cont");
+  const todas = el("button", "", "Selecionar todas");
+  todas.onclick = () => { est.sel[ev.id] = selDe(ev.id).length === ev.fotos.length ? [] : ev.fotos.map(f => f.id); salvar(); atualizarCartao(ev); };
+  const bx = el("button", "pri", "Baixar");
+  bx.onclick = () => baixarEventos([ev]);
+  rod.append(cont, todas, bx);
+  c.append(top, grade, rod);
+  c._ui = {pill, cont, bx, todas, grade};
+  atualizarCartao(ev, c);
+  return c;
+}
+function atualizarCartao(ev, c){
+  c = c || document.getElementById(ev.id); if (!c) return;
+  const s = selDe(ev.id), st = status(ev), u = c._ui;
+  u.pill.className = "pill " + st.c; u.pill.textContent = st.t;
+  c.classList.toggle("feito", st.c === "ok");
+  u.grade.querySelectorAll(".ft").forEach(d => d.classList.toggle("sel", s.includes(d.dataset.fid)));
+  const mb = ev.fotos.filter(f => s.includes(f.id)).reduce((a,f) => a + f.bytes, 0) / 1048576;
+  u.cont.textContent = s.length ? `${s.length} selecionada(s) · ${mb.toFixed(1)} MB` : "Clique nas fotos para selecionar";
+  u.bx.disabled = !s.length;
+  u.bx.textContent = s.length ? `Baixar ${s.length} (zip)` : "Baixar";
+  u.todas.textContent = s.length === ev.fotos.length ? "Limpar seleção" : "Selecionar todas";
+  atualizarProgresso();
+}
+function alternar(ev, fid){
+  const s = selDe(ev.id).slice(), i = s.indexOf(fid);
+  if (i >= 0) s.splice(i, 1); else s.push(fid);
+  // mantém a ordem das fotos do evento
+  est.sel[ev.id] = ev.fotos.map(f => f.id).filter(x => s.includes(x));
+  salvar(); atualizarCartao(ev);
+}
+
+// ---------- miniaturas (carregadas sob demanda) ----------
+let fila = [], ativos = 0;
+const io = new IntersectionObserver(es => es.forEach(e => {
+  if (e.isIntersecting){ io.unobserve(e.target); fila.push(e.target); bombear(); }
+}), {rootMargin:"400px"});
+function observarMinis(){ document.querySelectorAll("img[data-src]").forEach(i => io.observe(i)); }
+const cacheMini = {};
+function bombear(){
+  while (ativos < 6 && fila.length){
+    const img = fila.shift(), src = img.dataset.src; ativos++;
+    const p = cacheMini[src] || (cacheMini[src] = baixarBin(src).then(b => URL.createObjectURL(new Blob([b], {type:"image/jpeg"}))));
+    p.then(u => { img.src = u; img.removeAttribute("data-src"); })
+     .catch(() => { delete cacheMini[src]; img.alt = "erro"; })
+     .finally(() => { ativos--; bombear(); });
+  }
+}
+
+// ---------- visualização grande ----------
+let lbEv, lbI, lbUrl;
+async function abrirLB(ev, i){
+  lbEv = ev; lbI = i;
+  const lb = document.getElementById("lb"); lb.style.display = "flex";
+  const f = ev.fotos[i], img = document.getElementById("lbImg"), car = document.getElementById("lbCarreg");
+  document.getElementById("lbInfo").textContent = `${i+1}/${ev.fotos.length} · ${f.nome} · ${(f.bytes/1048576).toFixed(1)} MB`;
+  atualizarLBSel();
+  img.src = cacheMini[urlMini(f)] ? await cacheMini[urlMini(f)] : ""; car.style.display = "block";
+  try {
+    const b = await baixarBin(urlOrig(f));
+    if (lbEv !== ev || lbI !== i) return;
+    if (lbUrl) URL.revokeObjectURL(lbUrl);
+    lbUrl = URL.createObjectURL(new Blob([b], {type:"image/jpeg"}));
+    img.src = lbUrl;
+  } catch(x){ car.textContent = "Erro ao carregar: " + x.message; return; }
+  car.style.display = "none";
+}
+function atualizarLBSel(){
+  const on = selDe(lbEv.id).includes(lbEv.fotos[lbI].id), b = document.getElementById("lbSel");
+  b.textContent = on ? "✓ Selecionada" : "Selecionar"; b.className = on ? "pri" : "";
+}
+function fecharLB(){ document.getElementById("lb").style.display = "none"; lbEv = null; }
+document.getElementById("lbFechar").onclick = fecharLB;
+document.getElementById("lbAnt").onclick = () => lbEv && abrirLB(lbEv, (lbI - 1 + lbEv.fotos.length) % lbEv.fotos.length);
+document.getElementById("lbProx").onclick = () => lbEv && abrirLB(lbEv, (lbI + 1) % lbEv.fotos.length);
+document.getElementById("lbSel").onclick = () => { alternar(lbEv, lbEv.fotos[lbI].id); atualizarLBSel(); };
+document.getElementById("lb").onclick = e => { if (e.target.id === "lb") fecharLB(); };
+document.addEventListener("keydown", e => {
+  if (!lbEv) return;
+  if (e.key === "Escape") fecharLB();
+  if (e.key === "ArrowLeft") document.getElementById("lbAnt").click();
+  if (e.key === "ArrowRight") document.getElementById("lbProx").click();
+  if (e.key === " "){ e.preventDefault(); document.getElementById("lbSel").click(); }
+});
+
+// ---------- download ----------
+const nomeArq = s => s.replace(/[\\/:*?"<>|]+/g, "-").replace(/\s+/g, " ").trim().slice(0, 150);
+function modal(on, tit){ document.getElementById("modal").style.display = on ? "flex" : "none"; if (tit) document.getElementById("mTit").textContent = tit; }
+function passo(frac, txt){ document.getElementById("mBarra").style.width = (100*frac) + "%"; document.getElementById("mTxt").textContent = txt; }
+
+async function baixarEventos(lista, tipo = "individual"){
+  lista = lista.filter(ev => selDe(ev.id).length);
+  if (!lista.length) return;
+  const total = lista.reduce((a, ev) => a + selDe(ev.id).length, 0);
+  let feitas = 0;
+  modal(true, lista.length > 1 ? `Baixando ${lista.length} eventos…` : "Preparando o zip…");
+  try {
+    for (const ev of lista){
+      const s = selDe(ev.id), fotos = ev.fotos.filter(f => s.includes(f.id));
+      const zip = new JSZip();
+      for (const f of fotos){
+        passo(feitas / total, `${ev.titulo} — ${f.nome}`);
+        zip.file(f.nome, await baixarBin(urlOrig(f)), {binary:true});
+        feitas++;
+      }
+      passo(feitas / total, `Compactando ${ev.titulo}…`);
+      const blob = await zip.generateAsync({type:"blob", compression:"STORE"});
+      const nome = nomeArq(`${ev.data} - ${ev.titulo}`) + ".zip";
+      const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = nome;
+      document.body.append(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 60000);
+      const q = agora();
+      est.baixado[ev.id] = {quando:q, fotos:s.slice()};
+      est.log.push({quando:q, tipo, evento:ev.titulo, pasta:ev.pasta, item:ev.item, zip:nome, fotos:fotos.map(f => f.nome)});
+      salvar(); atualizarCartao(ev); atualizarProgresso();
+      if (lista.length > 1) await new Promise(r => setTimeout(r, 900));  // o navegador aceita downloads em sequência
+    }
+  } catch(x){ alert("Falha no download: " + x.message); }
+  modal(false);
+  if (vista === "resumo") render();
+}
+
+// ---------- resumo / pendências ----------
+function renderResumo(main){
+  const comSel = EVENTOS.filter(ev => selDe(ev.id).length);
+  const ok = EVENTOS.filter(baixadoOk), alt = EVENTOS.filter(ev => status(ev).t.startsWith("Seleção alterada"));
+  const naoBx = EVENTOS.filter(ev => status(ev).t === "Não baixado"), semSel = EVENTOS.filter(ev => !selDe(ev.id).length && !est.baixado[ev.id]);
+  const nSel = comSel.reduce((a, ev) => a + selDe(ev.id).length, 0);
+  const cards = el("div", "cards");
+  [[EVENTOS.length, "eventos"], [ok.length, "baixados"], [naoBx.length + alt.length, "selecionados e não baixados"],
+   [semSel.length, "ainda sem seleção"], [nSel, "fotos selecionadas"]].forEach(([n, t]) => {
+    const d = el("div", "num"); d.innerHTML = `<b>${n}</b><span>${t}</span>`; cards.append(d);
+  });
+  main.append(el("h2", "secao", "Resumo"), cards);
+
+  const ferr = el("div", "ferr");
+  const bt = el("button", "pri", `Baixar todos os selecionados (${comSel.length} eventos, um zip por evento)`);
+  bt.disabled = !comSel.length; bt.onclick = () => baixarEventos(comSel, "todos");
+  const btP = el("button", "", `Baixar só os pendentes (${naoBx.length + alt.length})`);
+  btP.disabled = !(naoBx.length + alt.length); btP.onclick = () => baixarEventos([...naoBx, ...alt], "pendentes");
+  const btCsv = el("button", "", "Exportar log (CSV)"); btCsv.onclick = exportarCSV;
+  const btJs = el("button", "", "Salvar seleção (arquivo)"); btJs.onclick = exportarJSON;
+  const btIm = el("button", "", "Carregar seleção (arquivo)"); btIm.onclick = importarJSON;
+  ferr.append(bt, btP, btCsv, btJs, btIm);
+  main.append(ferr);
+
+  main.append(el("h2", "secao", "O que falta baixar"));
+  const falta = EVENTOS.filter(ev => !baixadoOk(ev));
+  if (!falta.length) main.append(el("div", "sem", "Tudo baixado. ✓"));
+  else main.append(tabela(["Evento", "Item da lista", "Situação", ""], falta.map(ev => {
+    const st = status(ev);
+    return [ev.titulo + " · " + dataBR(ev.data), ev.item, `<span class="pill ${st.c}">${st.t}</span>` + (selDe(ev.id).length ? ` ${selDe(ev.id).length} foto(s)` : ""), irPara(ev)];
+  }), true));
+
+  const sem = [];
+  M.secoes.forEach(s => s.itens.forEach(it => it.sem_fotos && sem.push([it.titulo, s.titulo, esc(it.sem_fotos)])));
+  main.append(el("h2", "secao", "Itens da lista sem fotos no material"));
+  main.append(tabela(["Item", "Seção", "Motivo"], sem.map(r => r.map((v, i) => i < 2 ? esc(v) : v)), true));
+
+  main.append(el("h2", "secao", "Log de downloads"));
+  if (!est.log.length) main.append(el("div", "sem", "Nenhum download ainda."));
+  else main.append(tabela(["Quando", "Evento", "Fotos", "Tipo"],
+    est.log.slice().reverse().map(l => [l.quando, esc(l.evento), esc(l.fotos.join(", ")), l.tipo]), true));
+  main.append(el("p", "pg", `Material gerado em ${M.gerado}. A seleção e o log ficam salvos neste navegador; use “Salvar seleção” para levar a outro computador.`));
+}
+function irPara(ev){
+  return `<a data-ev="${ev.id}">abrir</a>`;
+}
+document.addEventListener("click", e => {
+  const a = e.target.closest("a[data-ev]"); if (!a) return;
+  const ev = POR_ID[a.dataset.ev]; pagina = Math.floor(ev.n / POR_PAGINA); vista = "eventos";
+  document.querySelectorAll(".abas button").forEach(x => x.classList.toggle("ativa", x.dataset.v === "eventos"));
+  render(); setTimeout(() => document.getElementById(ev.id).scrollIntoView({behavior:"smooth", block:"start"}), 50);
+});
+function tabela(cab, linhas, html){
+  const t = document.createElement("table");
+  t.innerHTML = "<tr>" + cab.map(c => `<th>${c}</th>`).join("") + "</tr>" +
+    linhas.map(l => "<tr>" + l.map(c => `<td>${html ? c : esc(c)}</td>`).join("") + "</tr>").join("");
+  const w = el("div"); w.style.overflowX = "auto"; w.append(t); return w;
+}
+
+function salvarArquivo(conteudo, nome, tipo){
+  const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([conteudo], {type:tipo})); a.download = nome;
+  document.body.append(a); a.click(); a.remove();
+}
+function exportarCSV(){
+  const q = v => `"${String(v).replace(/"/g, '""')}"`;
+  const linhas = [["item_lista","evento","data","pasta","fotos_selecionadas","qtd","situacao","baixado_em"].join(";")];
+  EVENTOS.forEach(ev => {
+    const s = selDe(ev.id), nomes = ev.fotos.filter(f => s.includes(f.id)).map(f => f.nome);
+    linhas.push([ev.item, ev.titulo, ev.data, ev.pasta, nomes.join(", "), nomes.length, status(ev).t, (est.baixado[ev.id] || {}).quando || ""].map(q).join(";"));
+  });
+  salvarArquivo("﻿" + linhas.join("\r\n"), "selecao_fotos_revista.csv", "text/csv");
+}
+function exportarJSON(){ salvarArquivo(JSON.stringify(est, null, 1), "selecao_fotos_revista.json", "application/json"); }
+function importarJSON(){
+  const inp = document.createElement("input"); inp.type = "file"; inp.accept = ".json,application/json";
+  inp.onchange = async () => {
+    try {
+      const e = JSON.parse(await inp.files[0].text());
+      if (!e.sel || !e.baixado || !e.log) throw new Error("arquivo inválido");
+      if (!confirm("Substituir a seleção e o log deste navegador pelos do arquivo?")) return;
+      est = e; salvar(); render();
+    } catch(x){ alert("Não foi possível carregar: " + x.message); }
+  };
+  inp.click();
+}
+
+// ---------- util ----------
+function el(tag, cls, txt){ const e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; }
+function esc(s){ return String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+function dataBR(d){ return d ? d.slice(8,10) + "/" + d.slice(5,7) + "/" + d.slice(0,4) : ""; }
+
+// ---------- partida ----------
+(async () => {
+  CFG = await (await fetch("config.json")).json();
+  let raw = null;
+  try { raw = sessionStorage.getItem("k") || localStorage.getItem("k"); } catch(_) {}
+  if (raw){ try { await entrarComChave(raw); iniciar(); return; } catch(_) {} }
+})();
+</script>
+</body>
+</html>
