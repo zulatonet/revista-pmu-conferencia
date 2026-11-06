@@ -6,6 +6,7 @@
 <meta name="robots" content="noindex, nofollow">
 <title>Conferência de Fotos</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/piexifjs/1.0.6/piexif.min.js"></script>
 <style>
 :root{
   --bg:#f4f5f7; --card:#fff; --txt:#1d2433; --sub:#5d6678; --linha:#e2e5ea;
@@ -533,6 +534,37 @@ document.addEventListener("keydown", e => {
   if (e.key === " "){ e.preventDefault(); document.getElementById("lbSel").click(); }
 });
 
+// ---------- marca no arquivo (campo "Comentários" do Windows) ----------
+// Só o cabeçalho EXIF muda; a imagem não é recomprimida.
+const COMENTARIO = "Curadoria: André Zulato - zulatonet.com.br";
+function utf16(s){ const a = []; for (const ch of s){ const c = ch.charCodeAt(0); a.push(c & 255, c >> 8); } a.push(0, 0); return a; }
+function marcar(buf){
+  try {
+    if (typeof piexif === "undefined") return buf;
+    const u8 = new Uint8Array(buf);
+    if (u8[0] !== 0xFF || u8[1] !== 0xD8) return buf;            // não é JPEG
+    let s = "";
+    for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000));
+    let novo;
+    try {
+      const exif = piexif.load(s);
+      exif["0th"][piexif.ImageIFD.XPComment] = utf16(COMENTARIO);
+      novo = piexif.insert(piexif.dump(exif), s);
+    } catch(_) {
+      // EXIF original ilegível: recria um mínimo, preservando orientação e data
+      let ori, data;
+      try { const e = piexif.load(s); ori = e["0th"][piexif.ImageIFD.Orientation]; data = e.Exif[piexif.ExifIFD.DateTimeOriginal]; } catch(_) {}
+      const exif = {"0th": {[piexif.ImageIFD.XPComment]: utf16(COMENTARIO)}, "Exif": {}, "GPS": {}, "Interop": {}, "1st": {}, "thumbnail": null};
+      if (ori) exif["0th"][piexif.ImageIFD.Orientation] = ori;
+      if (data) exif.Exif[piexif.ExifIFD.DateTimeOriginal] = data;
+      novo = piexif.insert(piexif.dump(exif), piexif.remove(s));
+    }
+    const out = new Uint8Array(novo.length);
+    for (let i = 0; i < novo.length; i++) out[i] = novo.charCodeAt(i);
+    return out.buffer;
+  } catch(e){ console.warn("sem marca:", e); return buf; }
+}
+
 // ---------- download ----------
 const nomeArq = s => s.replace(/[\\/:*?"<>|]+/g, "-").replace(/\s+/g, " ").trim().slice(0, 150);
 function modal(on, tit){ document.getElementById("modal").style.display = on ? "flex" : "none"; if (tit) document.getElementById("mTit").textContent = tit; }
@@ -550,7 +582,7 @@ async function baixarEventos(lista, tipo = "individual"){
       const zip = new JSZip();
       for (const f of fotos){
         passo(feitas / total, `${ev.titulo} — ${f.nome}`);
-        zip.file(f.nome, await baixarBin(urlOrig(f)), {binary:true});
+        zip.file(f.nome, marcar(await baixarBin(urlOrig(f))), {binary:true});
         feitas++;
       }
       passo(feitas / total, `Compactando ${ev.titulo}…`);
